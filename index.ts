@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits } = require("discord.js");
 const { execFile } = require("child_process");
 const { config } = require("./config.ts");
-const { COMMANDS, MESSAGES, URLS } = require("./constants.ts");
+const { COMMANDS, MESSAGES, URLS, wn } = require("./constants.ts");
 import type { RequestResult, Workload } from "./interface.ts";
 
 // ---------- Config ----------
@@ -79,7 +79,7 @@ async function getAllServers(message: any) : Promise<RequestResult> {
   }
   else{
     let serverList = "Servers:\n";
-    serverList = workloads.map((workload, idx) => `${idx + 1}. ${workload.name}, State: ${workload.state}`).join("\n");
+    serverList += workloads.map((workload, idx) => `${idx + 1}. ${workload.name}, State: ${workload.state}`).join("\n");
     message.channel.send(serverList);
     res.body = workloads.map((workload) => `${workload.id}`);
   }
@@ -101,7 +101,8 @@ async function chooseServer(message: any) : Promise< string | null > {
  
     const choice = parseInt(collected.first().content, 10);
     if (!choice || choice < 1 || choice > res.body.length) {
-      return message.channel.send(MESSAGES.NOT_VALID_OPTION);
+      message.channel.send(MESSAGES.NOT_VALID_OPTION)
+      return null;
     }
  
     const selected = res.body[choice - 1];
@@ -130,9 +131,39 @@ async function startServer(message: any) : Promise<RequestResult> {
     return {message: MESSAGES.NOT_VALID_OPTION, status: 400, body: []};
   }
 
-  return await makeRequest(URLS.wake(selectedId), "POST", MESSAGES.SERVER_START_SUCCESS, MESSAGES.SERVER_START_FAILURE);
+  return await makeRequest(URLS.start(selectedId), "POST", MESSAGES.SERVER_START_SUCCESS, MESSAGES.SERVER_START_FAILURE);
+}
+
+async function stopServer(message: any) : Promise<RequestResult> {
+  const selectedId = await chooseServer(message);
+
+  if(!selectedId) {
+    return {message: MESSAGES.NOT_VALID_OPTION, status: 400, body: []};
+  }
+
+  return await makeRequest(URLS.stop(selectedId), "POST", MESSAGES.SERVER_STOP_SUCCESS, MESSAGES.SERVER_STOP_FAILURE);
+}
+
+async function sleepServer(message: any) : Promise<RequestResult> {
+  const selectedId = await chooseServer(message);
+
+  if(!selectedId) {
+    return {message: MESSAGES.NOT_VALID_OPTION, status: 400, body: []};
+  }
+
+  return await makeRequest(URLS.sleep(selectedId), "POST", MESSAGES.SERVER_SLEEP_SUCCESS, MESSAGES.SERVER_SLEEP_FAILURE);
 }
  
+async function restartServer(message: any) : Promise<RequestResult> {
+  const selectedId = await chooseServer(message);
+
+  if(!selectedId) {
+    return {message: MESSAGES.NOT_VALID_OPTION, status: 400, body: []};
+  }
+
+  return await makeRequest(URLS.restart(selectedId), "POST", MESSAGES.SERVER_RESTART_SUCCESS, MESSAGES.SERVER_RESTART_FAILURE);
+}
+
 async function checkMessageContent(content: string, message: any) : Promise<RequestResult> {
   switch (content) {
     case "!getall":
@@ -142,13 +173,15 @@ async function checkMessageContent(content: string, message: any) : Promise<Requ
     case "!start":
       return await startServer(message);
     case "!stop":
-      break
+      return await stopServer(message);
     case "!sleep":
-      break;
+      return await sleepServer(message);
     case "!restart":
-      break;
+      return await restartServer(message);
+    case "!jomok":
+      return {message: wn.ws, status: 200, body: []};
     case "!help":
-      return {message: "Commands:\n !wake - Wake the server\n !start - Start the server\n", status: 200, body: []};
+      return {message: "Commands:\n !getall - Get all servers list\n !wake - Wake the server\n !start - Start the server\n !stop - Stop the server to idle state\n !sleep - Sleep the server\n !restart - Restart the server while running", status: 200, body: []};
     default:
       return {message: "Unknown command. Type !help for a list of commands.", status: 400, body: []};
   }
